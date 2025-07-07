@@ -1,0 +1,1900 @@
+---
+title: "Rugila et al 2025- Fast and slow paced reproductive life history"
+author: "Allison Rugila"
+date: '2025-07-07'
+output: html_documents
+---
+
+Urosalpinx cinerea reproductive phenology (Figure 1)
+```{r Reproductive phenology - Producing Figure 1}
+#Loading packages
+library(readxl)
+library(ggplot2)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggspatial)
+library(dplyr)
+library(tidyverse)
+library(ggpubr)
+
+#Import GPS locations for collection sites
+GPS <- read_excel("Data/Urosalpinx_CollectionSites.xlsx")
+GPS <- GPS[c(1:11),]
+
+#Duplicating collection site information to modify GPS site labels on final map
+GPS.labels <- GPS
+GPS.labels <- GPS.labels[1:11,]
+GPS.labels[5,4] <- 40.5
+GPS.labels[5,5] <- -73  
+GPS.labels[1,4] <- 31.8   
+GPS.labels[10,4] <- 38.6  
+GPS.labels[9,4] <- 37.1 
+GPS.labels$Lat2 <- c(31.800, 32.660, 34.718, 38.785, 40.400, 41.524, 43.107, 37.894, 37.591, 38.118, 46.501)
+GPS.labels$Long2 <- c(-78,-78,-73.5,-73.5,-68.5,-68.5,-68.5,-124,-124,-124,-124)
+head(GPS.labels)
+
+#Import map layer for North America
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+#Collection Sites plot
+#Define colors to relate GPS location of population with reproductive phenology data
+GPS.labels$Colors <- c("#7570B3", "black", "#D95F02", "#E6AB02", "#A6761D",  "#666666","#1B9E77", 
+                "#CAB2D6", "#6A3D9A", "#FF7F00", "#B15928")
+
+GPS$Colors <-c("#7570B3", "black", "#D95F02", "#E6AB02", "#A6761D",  "#666666","#1B9E77", 
+                "#6A3D9A", "#CAB2D6", "#FF7F00", "#B15928")
+#Atlantic
+Atlantic.Site.plot <- ggplot(data = world) +
+ # theme_set(theme_bw())+
+   theme_bw(base_size = 18)+
+   theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    #panel.border = element_blank(),
+    panel.background = element_blank())+
+    geom_sf() +
+   xlab(" ")+
+  ylab(" ")+
+  geom_text(data = GPS.labels, aes(x = Long2, y = Lat2, label = SiteID), size = 10) +
+    geom_point(data = GPS, aes(x = Long, y = Lat), size = 5, 
+        shape = 21, fill = GPS$Colors) +
+    coord_sf(xlim = c(-82, -64), ylim = c(25, 45), expand = FALSE)+
+    scale_x_continuous(breaks=c(-82,-75,-64))+
+    annotation_scale(location = "br", width_hint = 0.3) +
+    annotation_north_arrow(location = "br", which_north = "true", 
+        pad_x = unit(0.0, "in"), pad_y = unit(0.2, "in"),
+        style = north_arrow_fancy_orienteering)
+
+Atlantic.Site.plot
+
+#Pacific
+Pacific.Site.plot <- ggplot(data = world) +
+  theme_bw(base_size = 18)+
+   theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    #panel.border = element_blank(),
+    panel.background = element_blank())+
+    geom_sf() +
+  #xlab("Longitude")+
+  #ylab("Latitude")+
+   xlab(" ")+
+  ylab(" ")+
+  geom_text(data = GPS.labels, aes(x = Long - 1.5, y = Lat, label = SiteID), size = 10) +
+    geom_point(data = GPS, aes(x = Long, y = Lat), size = 5, 
+        shape = 21, fill = GPS$Colors) +
+    coord_sf(xlim = c(-128, -120), ylim = c(36, 50), expand = FALSE)+
+      annotation_scale(location = "bl", width_hint = 0.4) +
+  scale_x_continuous(breaks=c(-128,-124,-120))
+Pacific.Site.plot
+
+
+#Import reproductive phenology data to summarize timing of reproduction by population
+Urosalpinx_ReproductivePhenology <- read_excel("Data/Urosalpinx_ReproductivePhenology.xlsx")
+
+#Duplicate phenology dataframe
+SpawningWindow<- Urosalpinx_ReproductivePhenology
+SpawningWindow$PopID <- paste0(SpawningWindow$Population, " ", SpawningWindow$Condo_ID)
+
+#Manually adding in metadata for affiliated Coast: Atlantic or Pacific
+SpawningWindow$Coast <- c()
+SpawningWindow$Coast[SpawningWindow$Population == "GA" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "SC" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "NC" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "DE" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "RI" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "MA" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "NH" ]<- "Atlantic"
+SpawningWindow$Coast[SpawningWindow$Population == "TO" ]<- "Pacific"
+SpawningWindow$Coast[SpawningWindow$Population == "RB" ]<- "Pacific"
+SpawningWindow$Coast[SpawningWindow$Population == "CP" ]<- "Pacific"
+SpawningWindow$Coast[SpawningWindow$Population == "WP" ]<- "Pacific"
+
+#Summarize Spawning window as the first and last clutches laid by a unique female
+SpawningWindow$Clutch_Lay_date <- as.Date(SpawningWindow$Clutch_Lay_date)
+spawning.window.df <- SpawningWindow %>%
+          dplyr::group_by(Population, Condo_ID, Coast, Female_size_mm) %>%
+          dplyr::summarize(
+            avg.mean = mean(Clutch_Lay_date, na.rm =TRUE),
+              avg.min = min(Clutch_Lay_date, na.rm =TRUE),
+          avg.max = max(Clutch_Lay_date, na.rm = TRUE),
+          count.clutches =  sum(!is.na(Clutch_Lay_date)))
+        head(spawning.window.df)
+
+
+#Subset raw and summarized phenology data by Coast
+spawning.window.df.Atlantic <- spawning.window.df[spawning.window.df$Coast != "Pacific",]
+SpawningWindow.Atlantic <- SpawningWindow[SpawningWindow$Coast != "Pacific",]
+
+spawning.window.df.Pacific <- spawning.window.df[spawning.window.df$Coast != "Atlantic",]
+SpawningWindow.Pacific <-SpawningWindow[SpawningWindow$Coast != "Atlantic",]
+  
+#Manually order source population by latitude to facilitate plotting
+spawning.window.df.Atlantic$Population <- factor(spawning.window.df.Atlantic$Population, levels=as.character(c("NH","MA", "RI", "DE", "NC", "SC", "GA") ) )
+  SpawningWindow.Atlantic$Population <- factor(SpawningWindow.Atlantic$Population, levels=as.character(c("NH","MA", "RI", "DE", "NC", "SC", "GA") ) )
+  spawning.window.df.Pacific$Population <- factor(spawning.window.df.Pacific$Population, levels=as.character(c("WP","TO", "RB", "CP") ) ) 
+  SpawningWindow.Pacific$Population <- factor(SpawningWindow.Pacific$Population, levels=as.character(c("WP","TO", "RB", "CP") ) ) 
+
+#Plot reproductive phenology data, where points denote the onset and termination of reproduction and lines define the the spawning window for an individual female
+#Atlantic reproductive phenology
+Atlantic.Plot.FINAL <- ggplot(data = spawning.window.df.Atlantic, group = Population, fill = Population, color = Population)+
+  xlab("Month")+
+   ylab(expression("Female size (mm)"))+
+  theme_bw(base_size = 20)+
+   geom_point(data = SpawningWindow.Atlantic, aes(x= Clutch_Lay_date, y= Female_size_mm, color = Population), size = 2)+
+ scale_color_manual(values = c("#1B9E77", "#666666", "#A6761D", "#E6AB02", "#D95F02","black", "#7570B3"))+  
+  geom_linerange(data = spawning.window.df.Atlantic, aes(y = Female_size_mm, x = avg.mean, xmin = avg.min, xmax = avg.max), size=1,alpha=0.3)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))+
+        theme(legend.position = "none")+
+      facet_grid(rows = vars(Population))+
+   ylim(c(13,30))+
+   theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank())+
+      facet_grid(rows = vars(Population))+
+       scale_x_date(date_breaks = "2 month", date_labels =  "%b")
+Atlantic.Plot.FINAL
+
+#Pacific reproductive phenology
+Pacific.Plot.FINAL <- ggplot(data = spawning.window.df.Pacific, group = Population, fill = Population, color = Population)+
+  xlab("Month")+
+   ylab(expression("Female size (mm)"))+
+  theme_bw(base_size = 20)+
+ geom_point(data = SpawningWindow.Pacific, aes(x= Clutch_Lay_date, y= Female_size_mm, color = Population), size = 2)+
+  scale_color_manual(values = c("#B15928", "#FF7F00","#6A3D9A", "#CAB2D6"))+
+  geom_linerange(data = spawning.window.df.Pacific, aes(y = Female_size_mm, x = avg.mean, xmin = avg.min, xmax = avg.max), size=1,alpha=0.3)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))+
+        theme(legend.position = "none")+
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank())+
+      facet_grid(rows = vars(Population))+
+   ylim(c(13,30))+
+     scale_x_date(date_breaks = "2 month", date_labels =  "%b")
+Pacific.Plot.FINAL
+
+ReproductivePhenology_Panel  <- ggarrange(Pacific.Plot.FINAL, Pacific.Site.plot, Atlantic.Site.plot, Atlantic.Plot.FINAL,
+                  widths = c(0.67, 1.1,1.8,0.67),
+                    ncol = 4, nrow = 1)
+    ReproductivePhenology_Panel 
+    
+```
+
+
+Reproductive output per female 
+```{r Reproductive output per female - raw data visualization}
+library(GGally)
+
+Urosalpinx_SummaryStatistics_ReproOutput <- read_excel("Data/Urosalpinx_SummaryStatistics_ReproOutput.xlsx")
+Urosalpinx_SummaryStatistics_ReproOutput$Population <- as.factor(Urosalpinx_SummaryStatistics_ReproOutput$Population)
+
+#Visualize data and determine correlation coefficients among variables
+ggpairs(Urosalpinx_SummaryStatistics_ReproOutput, columns = c("Population", "Female_Mid_mm", "total_num_capsules", "total_num_clutches", "total_num_embryos","total_num_hatchlings"))
+
+#Visualize reproductive output for potential outliers
+#Total numbers of embryos per female
+ggplot(Urosalpinx_SummaryStatistics_ReproOutput, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= total_num_embryos)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Total number of embryos per female") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+#Total numbers of egg clutches per female
+ggplot(Urosalpinx_SummaryStatistics_ReproOutput, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= total_num_clutches)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Total number of clutches per female") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+#Total numbers of egg capsules laid per female
+ggplot(Urosalpinx_SummaryStatistics_ReproOutput, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= total_num_capsules)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Total number of capsules per female") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+#Total numbers of juveniles produced per female
+ggplot(Urosalpinx_SummaryStatistics_ReproOutput, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= total_num_hatchlings)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Total number of hatchlings per female") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+```
+
+```{r GLMM model selection - Reproductive output per female }
+library(glmmTMB)
+library(DHARMa)
+library(performance)
+
+#GLMMs for Figure 2a: Total number of embryos per female
+Repro.embryos.int <- glmmTMB(total_num_embryos ~ Population * Female_Mid_mm, data= Urosalpinx_SummaryStatistics_ReproOutput, ziformula = ~1, family = nbinom1)
+      simulateResiduals(Repro.embryos.int, n = 1000, plot = TRUE) #KS p=0.87, dispersion p=0.9, outlier p=1
+      testDispersion(Repro.embryos.int) #p=0.92
+      testZeroInflation(Repro.embryos.int) #p=1
+
+#GLMMs for Figure S4
+
+#Total number of capsules per female
+Repro.capsules.int <- glmmTMB(total_num_capsules ~ Population * Female_Mid_mm, data= Urosalpinx_SummaryStatistics_ReproOutput, ziformula = ~1, family = nbinom1)
+      simulateResiduals(Repro.capsules.int, n = 1000, plot = TRUE) #KS p=0.65, dispersion p=0.24, outlier p=0.1
+      testDispersion(Repro.capsules.int) #p=0.29
+      testZeroInflation(Repro.capsules.int) #p=1
+
+#Total number of clutches per female
+Repro.clutches.int <- glmmTMB(total_num_clutches ~ Population * Female_Mid_mm, data= Urosalpinx_SummaryStatistics_ReproOutput, ziformula = ~1, family = nbinom1)
+      simulateResiduals(Repro.clutches.int, n = 1000, plot = TRUE) #KS p=0.99, dispersion p=0.9, outlier p=1
+      testDispersion(Repro.clutches.int) #p=0.87
+      testZeroInflation(Repro.clutches.int) #p=0.63
+      
+#Total number of hatchlings per female
+Repro.hatchlings.int <- glmmTMB(total_num_hatchlings ~ Population * Female_Mid_mm, data= Urosalpinx_SummaryStatistics_ReproOutput, ziformula = ~1, family = nbinom1)
+      simulateResiduals(Repro.hatchlings.int, n = 1000, plot = TRUE) #KS p=0.97, dispersion p=0.68, outlier p=1
+      testDispersion(Repro.hatchlings.int) #p=0.66
+      testZeroInflation(Repro.hatchlings.int) #p=90
+
+```
+
+```{r GLMM confidence intervals - plot for total number of embryos; Fig 2a}
+library(emmeans)
+library(car)
+library(multcomp)
+
+#Type II Wald chisquare test
+#Population and female size significantly affect number of embryos laid, but no significant interactive effect
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova(Repro.embryos.int, ) ## default type II 
+          }  
+
+# Tukey post-hoc
+m.output <- glht(Repro.embryos.int, mcp(Population = "Tukey"))
+ summary(m.output) 
+
+#Estimated marginal means for fitted model
+Repro.glm1.CI<- emmeans(Repro.embryos.int, specs= ~Population, type = "response" )
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+TotalNumEmbryos.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA","NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+TotalNumEmbryos.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+ # scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(TotalNumEmbryos.plot.Cali + rremove("ylab") + rremove("xlab"), TotalNumEmbryos.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(a)","(d)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/TotalNumEmbryosPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Total embryos"~female^-1), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+
+```
+
+```{r GLMM confidence intervals - plot for total number of capsules; Fig S4}
+library(emmeans)
+library(car)
+library(multcomp)
+
+#Type II Wald chisquare test
+#Population significantly affect number of embryos laid, but no significant interactive effect
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova(Repro.capsules.int, ) ## default type II 
+          }  
+
+# Tukey post-hoc
+m.output <- glht(Repro.capsules.int, mcp(Population = "Tukey"))
+ summary(m.output) 
+
+#Estimated marginal means for fitted model
+Repro.glm1.CI<- emmeans(Repro.capsules.int, specs= ~Population, type = "response" )
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+TotalNumCapsules.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA","NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+TotalNumCapsules.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+ # scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(TotalNumCapsules.plot.Cali + rremove("ylab") + rremove("xlab"), TotalNumCapsules.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(a)","(d)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/TotalNumCapsulesPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Total capsules"~female^-1), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+
+```
+
+```{r GLMM confidence intervals - plot for total number of clutches; Fig S4}
+library(emmeans)
+library(car)
+library(multcomp)
+
+#Type II Wald chisquare test
+#Population and female size significantly affect number of embryos laid, but no significant interactive effect
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova(Repro.clutches.int, ) ## default type II 
+          }  
+
+# Tukey post-hoc
+m.output <- glht(Repro.clutches.int, mcp(Population = "Tukey"))
+ summary(m.output) 
+
+#Estimated marginal means for fitted model
+Repro.glm1.CI<- emmeans(Repro.clutches.int, specs= ~Population, type = "response" )
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+TotalNumClutches.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA","NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+TotalNumClutches.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+ # scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(TotalNumClutches.plot.Cali + rremove("ylab") + rremove("xlab"), TotalNumClutches.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(a)","(d)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/TotalNumClutchesPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Total clutches"~female^-1), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+
+```
+
+```{r GLMM confidence intervals - plot for total number of hatchlings; Fig S4}
+library(emmeans)
+library(car)
+library(multcomp)
+
+#Type II Wald chisquare test
+#Population and female size significantly affect number of embryos laid, but no significant interactive effect
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova(Repro.hatchlings.int, ) ## default type II 
+          }  
+
+# Tukey post-hoc
+m.output <- glht(Repro.hatchlings.int, mcp(Population = "Tukey"))
+ summary(m.output) 
+
+#Estimated marginal means for fitted model
+Repro.glm1.CI<- emmeans(Repro.hatchlings.int, specs= ~Population, type = "response" )
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+TotalNumHatchlings.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA","NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+TotalNumHatchlings.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+  ylim(c(0,1000))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+ # scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(TotalNumHatchlings.plot.Cali + rremove("ylab") + rremove("xlab"), TotalNumHatchlings.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(a)","(d)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/TotalNumHatchlingsPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Total hatchlings"~female^-1), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+
+```
+
+
+Offspring provisioning
+```{r Raw data visualization - Offspring provisioning as capsule area per embryo}
+library(readxl)
+Urosalpinx_CapsuleArea <- read_excel("Data/Urosalpinx_CapsuleArea.xlsx")
+ReproOutput.CapsuleArea <- Urosalpinx_CapsuleArea
+ReproOutput.CapsuleArea$Population <- as.factor(ReproOutput.CapsuleArea$Population)
+
+ReproOutput.CapsuleArea$CapsuleAreaPerEmbryo <- ReproOutput.CapsuleArea$Area_mm2/ ReproOutput.CapsuleArea$Avg_embryo_density
+hist(ReproOutput.CapsuleArea$CapsuleAreaPerEmbryo)
+
+#Finding outliers 
+ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea[c(1:2796),] #remove NA's
+View(ReproOutput.CapsuleArea)
+ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea[-c(1),] #remove spurious TO_161_775 with value >15 
+
+#add new column to data frame that indicates if each observation is an outlier
+      find_outlier <- function(x) {
+        return(x < quantile(x, .25) - 1.5*IQR(x) | x > quantile(x, .75) + 1.5*IQR(x))
+      }
+      library(dplyr)
+      ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea %>%
+              group_by(Population) %>%
+              mutate(outlier = ifelse(find_outlier(CapsuleAreaPerEmbryo), Label, NA))
+      
+      ggplot(ReproOutput.CapsuleArea, aes(x=Population, y=CapsuleAreaPerEmbryo)) +
+        geom_boxplot() +
+        geom_text(aes(label=outlier), na.rm=TRUE, hjust=.3)
+
+#outliers to be removed:  Recall that labels are duplicated for capsules in same image
+      # "RI_142_720_2023June01_0x_001_E.jpg" 2 capsules >5
+      # NC_058_746_2023May17_0x_001_E.jpg" 3 capsules  >5
+
+Provisioning.NoOutlier <- ReproOutput.CapsuleArea[ReproOutput.CapsuleArea$CapsuleAreaPerEmbryo <=5,]
+        ggplot(Provisioning.NoOutlier, aes(x=Population, y=CapsuleAreaPerEmbryo)) +
+        geom_boxplot() +
+        geom_text(aes(label=outlier), na.rm=TRUE, hjust=.3)
+        
+Provisioning.NoOutlier <- ReproOutput.CapsuleArea[ReproOutput.CapsuleArea$CapsuleAreaPerEmbryo <=4,]
+        ggplot(Provisioning.NoOutlier, aes(x=Population, y=CapsuleAreaPerEmbryo)) +
+        geom_boxplot() +
+        geom_text(aes(label=outlier), na.rm=TRUE, hjust=.3)        
+        
+  #issues wth 2358 and 2706, which were identified as outliers based on SD #DOUBLE CHECK FROM LM QQPLOT
+ Provisioning.NoOutlier<- Provisioning.NoOutlier[-c(2358,2706),]
+
+hist(Provisioning.NoOutlier$CapsuleAreaPerEmbryo)
+ 
+library(ggplot2)
+ggplot(Provisioning.NoOutlier, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB","TO","WP"), ordered= T), y= CapsuleAreaPerEmbryo)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Per capita capsule area (mm2/embryo)") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+```
+
+```{r GLMM model selection - Offspring provisioning }
+library(glmmTMB)
+library(DHARMa)
+library(lmerTest)
+library(car) 
+library(emmeans) 
+library(multcomp)
+
+#Checking ANOVA model assumptions
+Provisioning.NoOutlier$Population <- as.factor(Provisioning.NoOutlier$Population)
+str(Provisioning.NoOutlier)
+
+hist(Provisioning.NoOutlier$CapsuleAreaPerEmbryo)
+Provisioning.lm <- lm(CapsuleAreaPerEmbryo ~ Population + FemaleSize_mm+ (1|CondoRep/TeaboyRep), data= Provisioning.NoOutlier)  
+    check_model(Provisioning.lm) #issues with normality of residuals
+    check_heteroscedasticity(Provisioning.lm) # p < 0.001
+    #check_overdispersion(Provisioning.lm) #underdispersed
+    
+    par(mfrow = c(2, 2))
+   plot(Provisioning.lm)
+
+#Model fit with gaussian distribution poor
+Provisioning.glmm <- glmmTMB(CapsuleAreaPerEmbryo ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                             data= Provisioning.NoOutlier, family = gaussian)
+      simulateResiduals(Provisioning.glmm, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0.018, Outlier p=0.08
+      testDispersion(Provisioning.glmm) #p=0.008
+
+Provisioning.glmm.disp <- glmmTMB(CapsuleAreaPerEmbryo ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                             dispformula = ~Population, ziformula = ~0, 
+                             data= Provisioning.NoOutlier, family = gaussian)
+      simulateResiduals(Provisioning.glmm.disp, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0, Outlier p=0.8
+      testDispersion(Provisioning.glmm.disp) #p=0
+      
+
+          Provisioning.disp.int <- glmmTMB(CapsuleAreaPerEmbryo ~ Population * FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                                       dispformula = ~Population, ziformula = ~0, 
+                                       data= Provisioning.NoOutlier, family = gaussian)      
+                             simulateResiduals(Provisioning.disp.int, n = 1000, plot = TRUE)  
+                             #KS p = 0, Dispersion p=0.014, Outlier p=0.3
+                             testDispersion(Provisioning.disp.int) #p=0
+
+#Model fit with gamma less poor, but still inadequate              
+Provisioning.gamma.disp <- glmmTMB(CapsuleAreaPerEmbryo ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), dispformula = ~Population, ziformula = ~0, 
+                                  data= Provisioning.NoOutlier, family = Gamma(link="log"))
+      simulateResiduals(Provisioning.gamma.disp, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0.014, Outlier p=0.19
+      testDispersion(Provisioning.gamma.disp) #p=0.016       
+    
+Provisioning.gamma.disp.int <- glmmTMB(CapsuleAreaPerEmbryo ~ Population * FemaleSize_mm + (1|CondoRep/TeaboyRep), dispformula = ~Population, ziformula = ~0, 
+                data= Provisioning.NoOutlier, family = Gamma(link="log"))
+                simulateResiduals(Provisioning.gamma.disp.int, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0.066, Outlier p=0.28
+                testDispersion(Provisioning.gamma.disp.int) #p=0.03     
+
+#Model fit with lognormal OK, but still issues with KS test; likely related to size of dataset            
+Provisioning.lognormal.disp <- glmmTMB(CapsuleAreaPerEmbryo ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), dispformula = ~Population, ziformula = ~0, data= Provisioning.NoOutlier, family = lognormal(link = "log"))
+                simulateResiduals(Provisioning.lognormal.disp, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0.052, Outlier p=0.39
+                testDispersion(Provisioning.lognormal.disp) #p=0.032     
+  
+Provisioning.lognormal.disp.int <- glmmTMB(CapsuleAreaPerEmbryo ~ Population * FemaleSize_mm + (1|CondoRep/TeaboyRep), dispformula = ~Population, ziformula = ~0, data= Provisioning.NoOutlier, family = lognormal(link = "log"))
+                simulateResiduals(Provisioning.lognormal.disp.int, n = 1000, plot = TRUE)  #KS p = 0, Dispersion p=0.14, Outlier p=0.14
+                testDispersion(Provisioning.lognormal.disp.int) #p=0.112     
+  
+
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( Provisioning.lognormal.disp, ) ## default type II 
+      }  
+                
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( Provisioning.lognormal.disp.int, ) ## default type II 
+      }     
+                
+#Analysis of Deviance Table (Type II Wald chisquare tests)
+# 
+# Response: CapsuleAreaPerEmbryo
+#                              Chisq Df Pr(>Chisq)    
+# Population               2227.3134 10     <2e-16 ***
+# FemaleSize_mm               0.1041  1      0.747    
+# Population:FemaleSize_mm  570.1768 10     <2e-16 ***
+            
+m.output <- glht(Provisioning.lognormal.disp, mcp(Population = "Tukey"))
+ summary(m.output) 
+ 
+#  Linear Hypotheses:
+#               Estimate Std. Error z value Pr(>|z|)    
+# DE - CP == 0  0.318503   0.027229  11.697    <0.01 ***
+# GA - CP == 0  0.572491   0.016928  33.820    <0.01 ***
+# MA - CP == 0  0.444563   0.032944  13.495    <0.01 ***
+# NC - CP == 0  0.179580   0.018613   9.648    <0.01 ***
+# NH - CP == 0  0.005241   0.040620   0.129   1.0000    
+# RB - CP == 0  0.141137   0.024588   5.740    <0.01 ***
+# RI - CP == 0  0.119387   0.016786   7.112    <0.01 ***
+# SC - CP == 0  0.373591   0.017866  20.911    <0.01 ***
+# TO - CP == 0  0.034034   0.017862   1.905   0.6642    
+# WP - CP == 0  0.224924   0.032833   6.851    <0.01 ***
+# GA - DE == 0  0.253988   0.026122   9.723    <0.01 ***
+# MA - DE == 0  0.126060   0.037922   3.324   0.0290 *  
+# NC - DE == 0 -0.138924   0.021633  -6.422    <0.01 ***
+# NH - DE == 0 -0.313262   0.046730  -6.704    <0.01 ***
+# RB - DE == 0 -0.177366   0.029037  -6.108    <0.01 ***
+# RI - DE == 0 -0.199116   0.023253  -8.563    <0.01 ***
+# SC - DE == 0  0.055088   0.023849   2.310   0.3757    
+# TO - DE == 0 -0.284470   0.029591  -9.613    <0.01 ***
+# WP - DE == 0 -0.093579   0.041990  -2.229   0.4298    
+# MA - GA == 0 -0.127928   0.032219  -3.971    <0.01 ** 
+# NC - GA == 0 -0.392911   0.017023 -23.081    <0.01 ***
+# NH - GA == 0 -0.567250   0.040779 -13.910    <0.01 ***
+# RB - GA == 0 -0.431353   0.023740 -18.170    <0.01 ***
+# RI - GA == 0 -0.453103   0.015895 -28.505    <0.01 ***
+# SC - GA == 0 -0.198900   0.016753 -11.873    <0.01 ***
+# TO - GA == 0 -0.538457   0.018124 -29.709    <0.01 ***
+# WP - GA == 0 -0.347567   0.033021 -10.526    <0.01 ***
+# NC - MA == 0 -0.264984   0.032393  -8.180    <0.01 ***
+# NH - MA == 0 -0.439322   0.049340  -8.904    <0.01 ***
+# RB - MA == 0 -0.303426   0.036744  -8.258    <0.01 ***
+# RI - MA == 0 -0.325176   0.032166 -10.109    <0.01 ***
+# SC - MA == 0 -0.070972   0.032359  -2.193   0.4544    
+# TO - MA == 0 -0.410529   0.033737 -12.169    <0.01 ***
+# WP - MA == 0 -0.219639   0.043001  -5.108    <0.01 ***
+# NH - NC == 0 -0.174339   0.042292  -4.122    <0.01 ** 
+# RB - NC == 0 -0.038442   0.021733  -1.769   0.7570    
+# RI - NC == 0 -0.060192   0.012632  -4.765    <0.01 ***
+# SC - NC == 0  0.194011   0.013386  14.494    <0.01 ***
+# TO - NC == 0 -0.145546   0.021902  -6.645    <0.01 ***
+# WP - NC == 0  0.045344   0.036932   1.228   0.9719    
+# RB - NH == 0  0.135897   0.044871   3.029   0.0693 .  
+# RI - NH == 0  0.114147   0.041138   2.775   0.1389    
+# SC - NH == 0  0.368350   0.041252   8.929    <0.01 ***
+# TO - NH == 0  0.028793   0.039488   0.729   0.9996    
+# WP - NH == 0  0.219683   0.048179   4.560    <0.01 ***
+# RI - RB == 0 -0.021750   0.022294  -0.976   0.9950    
+# SC - RB == 0  0.232453   0.022589  10.290    <0.01 ***
+# TO - RB == 0 -0.107104   0.025953  -4.127    <0.01 ** 
+# WP - RB == 0  0.083787   0.038852   2.157   0.4810    
+# SC - RI == 0  0.254203   0.014362  17.700    <0.01 ***
+# TO - RI == 0 -0.085354   0.019152  -4.457    <0.01 ***
+# WP - RI == 0  0.105537   0.034756   3.036   0.0684 .  
+# TO - SC == 0 -0.339557   0.018846 -18.018    <0.01 ***
+# WP - SC == 0 -0.148667   0.034635  -4.292    <0.01 ***
+# WP - TO == 0  0.190890   0.030837   6.190    <0.01 ***
+
+```
+
+```{r GLMM confidence intervals - plot of offspring provisioning; Fig 2}
+provisioningCI <- emmeans(Provisioning.lognormal.disp, "Population", type = "response")
+ProvisioningCI <- summary(provisioningCI)
+ProvisioningCI.df <- cbind(ProvisioningCI$response, ProvisioningCI$asymp.LCL, ProvisioningCI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, ProvisioningCI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+#Add coast info to raw data
+Provisioning.NoOutlier$Coast <- c()
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "GA" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "SC" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "NC" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "DE" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "RI" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "MA" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "NH" ]<- "Atlantic"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "TO" ]<- "Pacific"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "RB" ]<- "Pacific"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "CP" ]<- "Pacific"
+Provisioning.NoOutlier$Coast[Provisioning.NoOutlier$Population == "WP" ]<- "Pacific"
+
+#Replicate means for Pacific
+Provisioning.NoOutlier.Pacific <- Provisioning.NoOutlier[Provisioning.NoOutlier$Coast == "Pacific",]
+  #summary
+    library(tidyverse)
+            Prov.Pacific.Summary <- Provisioning.NoOutlier.Pacific %>%
+              group_by(Population, Coast, Condo_ID) %>%
+              summarize(
+                avg = mean(CapsuleAreaPerEmbryo, na.rm =TRUE),
+                SD = sd(CapsuleAreaPerEmbryo, na.rm = TRUE),
+                SE = sd(CapsuleAreaPerEmbryo, na.rm = TRUE)/sqrt(sum(!is.na(CapsuleAreaPerEmbryo))),
+                sample_size = sum(!is.na(CapsuleAreaPerEmbryo))
+              )
+            View(Prov.Pacific.Summary)
+            
+#Replicate means for Atlantic 
+Provisioning.NoOutlier.Atlantic <- Provisioning.NoOutlier[Provisioning.NoOutlier$Coast == "Atlantic",]
+  #summary
+            Prov.Atlantic.Summary <- Provisioning.NoOutlier.Atlantic %>%
+              group_by(Population, Coast, Condo_ID) %>%
+              summarize(
+                avg = mean(CapsuleAreaPerEmbryo, na.rm =TRUE),
+                SD = sd(CapsuleAreaPerEmbryo, na.rm = TRUE),
+                SE = sd(CapsuleAreaPerEmbryo, na.rm = TRUE)/sqrt(sum(!is.na(CapsuleAreaPerEmbryo))),
+                sample_size = sum(!is.na(CapsuleAreaPerEmbryo))
+              )
+            View(Prov.Atlantic.Summary)
+            
+Provisioning.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(1,3))+
+  ylab(expression("Predicted per capita capsule area "(mm^2/embryo)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+  #geom_jitter(data = Prov.Atlantic.Summary, aes(x= Population, y= avg), size = 2, alpha= 0.2,width = 0.15)
+#  scale_y_continuous( labels = scales::number_format(accuracy = 0.1))
+Provisioning.plot.NoCali
+
+Provisioning.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+ ylim(c(1,3))+
+  ylab(expression("Predicted per capita capsule area "(mm^2/embryo)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+  #geom_jitter(data = Prov.Pacific.Summary, aes(x= Population, y= avg), size = 2, alpha= 0.2,width = 0.15)
+  #scale_y_continuous(labels = scales::number_format(accuracy = 0.01))
+Provisioning.plot.Cali
+
+require(grid)   # for the textGrob() function
+library(ggpubr)
+figure <- ggarrange(Provisioning.plot.Cali + rremove("ylab") + rremove("xlab"), Provisioning.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(b)","(e)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/ProvisioningPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Per capita volume"~(mm^2~embryo^-1)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+```
+
+
+Juvenile Offspring size - Fig 2
+```{r Evaluating outliers - Juvenile size }
+library(performance)
+
+Urosalpinx_F1_HatchlingSize <- read_excel("Data/Urosalpinx_F1_HatchlingSize.xlsx")
+HatchlingRaw <- Urosalpinx_F1_HatchlingSize
+hist(HatchlingRaw$Area_mm2) #roughly normally distributed
+
+ggplot(HatchlingRaw, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= Area_mm2)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = .5, pch = 21) +
+  labs(x = "Population",
+       y = "Hatchling size (mm2)") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+#potentially outliers in WP and TO
+
+HatchlingRaw$Population <- as.factor(HatchlingRaw$Population)
+HatchlingRaw$TeaboyRep <- as.numeric(HatchlingRaw$TeaboyRep)
+HatchlingRaw$CondoRep <- as.numeric(HatchlingRaw$CondoRep)
+
+HatchlingSize.lm <- lm(Area_mm2 ~ Population + (1|CondoRep/TeaboyRep), HatchlingRaw)
+    check_model(HatchlingSize.lm) #issues with normality of residuals
+    check_heteroscedasticity(HatchlingSize.lm) # p < 0.001
+    
+    par(mfrow = c(2, 2))
+   plot(HatchlingSize.lm)
+   
+    qqPlot(HatchlingSize.lm)
+```
+
+```{r GLMM model selection - Juvenile size}
+library(emmeans) 
+library(multcomp)
+
+hatchlingsize.glmm <- glmmTMB(Area_mm2 ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                              dispformula = ~Population, ziformula = ~0, data= HatchlingRaw, 
+                              family = gaussian) 
+      simulateResiduals(hatchlingsize.glmm, n = 1000, plot = TRUE) #KS p = 0, Dispersion p=0.2, Outlier p=0.02  
+      testDispersion(hatchlingsize.glmm) # p= 0.24
+       
+hatchlingsize.lognorm <- glmmTMB(Area_mm2 ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                              dispformula = ~Population, ziformula = ~0, data= HatchlingRaw, 
+                              family = lognormal(link = "log")) 
+      simulateResiduals(hatchlingsize.lognorm, n = 1000, plot = TRUE) #KS p = 0, Dispersion p=0.58, Outlier p=0.69  
+      testDispersion(hatchlingsize.lognorm) # p= 0.54
+      
+hatchlingsize.lognorm.int <- glmmTMB(Area_mm2 ~ Population * FemaleSize_mm + (1|CondoRep/TeaboyRep), 
+                              dispformula = ~Population, ziformula = ~0, data= HatchlingRaw, 
+                              family = lognormal(link = "log")) 
+      simulateResiduals(hatchlingsize.lognorm.int, n = 1000, plot = TRUE) #KS p = 0, Dispersion p=0.72, Outlier p=0.43  
+      testDispersion(hatchlingsize.lognorm.int) # p= 0.68
+
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( hatchlingsize.lognorm, ) ## default type II 
+      }     
+
+# Response: Area_mm2
+#                 Chisq Df Pr(>Chisq)    
+# Population    1392.14 10  < 2.2e-16 ***
+# FemaleSize_mm  168.36  1  < 2.2e-16 ***
+          
+    
+m.output <- glht(hatchlingsize.lognorm, mcp(Population = "Tukey"))
+ summary(m.output)       
+
+
+```
+
+```{r GLMM confidence intervals - plot of juvenile size; Fig 2 }
+Repro.glm1.CI<- emmeans(hatchlingsize.lognorm, specs = ~Population, type = "response")
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+F1Size.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+  ylim(c(0,2))+
+  ylab(expression("Predicted per capita capsule area "(mm^2/embryo)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous( labels = scales::number_format(accuracy = 0.1))
+
+F1Size.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+ ylim(c(0,2))+
+  ylab(expression("Predicted per capita capsule area "(mm^2/embryo)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+  #theme(axis.text.y=element_blank())
+  #scale_y_continuous(labels = scales::number_format(accuracy = 0.01))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(F1Size.plot.Cali + rremove("ylab") + rremove("xlab"), F1Size.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(c)","(f)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/F1_JuvSize.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Size at hatching"~(mm^2)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)),bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+```
+
+
+Survival to hatching: Experiment 2 (F2 Embryo thermal tolerance at constant temperature)
+```{r Raw data visualization - Embryological thermal tolerance}
+Urosalpinx_EmbryologicalThermalTolerance <- read_excel("Data/Urosalpinx_EmbryologicalThermalTolerance.xlsx", sheet = 2)
+View(Urosalpinx_EmbryologicalThermalTolerance)
+UroSurv2 <- Urosalpinx_EmbryologicalThermalTolerance 
+
+#Include data only for populations in their home environment:
+UroSurv.Reduced <- UroSurv2[UroSurv2$TreatPop != "NH_NC",]
+UroSurv.Reduced <- UroSurv.Reduced[UroSurv.Reduced$TreatPop != "NC_NH",]
+UroSurv.Reduced <- UroSurv.Reduced[UroSurv.Reduced$TreatPop != "NH_GA",]
+UroSurv.Reduced <- UroSurv.Reduced[UroSurv.Reduced$TreatPop != "NA_RI",]
+UroSurv.Reduced$TreatPop <- as.factor(UroSurv.Reduced$TreatPop)
+
+#Visualizing raw data
+UroSurvivalPlot<- ggplot(data = UroSurv.Reduced, aes(x= Temperature, y = Prop_Survival), fill= Population) +
+  geom_point(aes(x = Temperature, y = Prop_Survival, group = Population,  color = Population, shape = Population))+
+  stat_smooth(method = "glm", method.args = list(family="binomial"), aes(color = Population, group = Population,fill = Population, linetype=Population), alpha = 0.1, se = TRUE)+
+  # scale_color_brewer(palette = "Dark2")+
+  ylab("Hatching success (%)") +
+  xlab(expression("Temperature " (degree*C)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")+
+  scale_y_continuous(limits = c(0,1))+
+  #facet_wrap(~Population, ncol=1)+
+  #facet_wrap(~Treat, ncol=1)+
+  #xlim(18,34)+
+  scale_x_continuous(breaks = seq(18, 34, len = 9))
+UroSurvivalPlot
+
+```
+
+```{r GLMM model selection and hypothesis testing - Embryological thermal tolerance}
+UroSurv2$Population <- as.factor(UroSurv2$Population)
+EIE_glmm_repro <- glmmTMB(Prop_Survival ~ Temperature * Population + ParentalTempAtTimeofLaying +(1|CondoID), 
+                    ziformula=~Population, data= UroSurv2, weights = Number_of_embryos, family = betabinomial) 
+EIE_glmm_repro1 <- glmmTMB(Prop_Survival ~ Temperature * Population + (1|ParentalTempAtTimeofLaying) +(1|CondoID), 
+                    ziformula=~Population, data= UroSurv2, weights = Number_of_embryos, family = betabinomial) 
+
+#Dharma: checking our model fit .. including under/over dispersion and outliers
+             simulateResiduals(EIE_glmm_repro, n = 1000, plot = TRUE) 
+             simulateResiduals(EIE_glmm_repro1, n = 1000, plot = TRUE) 
+             
+summary(EIE_glmm_repro)   
+library(emmeans)
+m.output2 <- glht(EIE_glmm_repro, lsm(pairwise ~ Temperature : Population), by = NULL) #all possible contrasts
+summary(m.output2) 
+
+# Linear Hypotheses:
+#                                                                      Estimate Std. Error t value Pr(>|t|)   
+# Temperature26.6700251889169 GA - Temperature26.6700251889169 NC == 0  -0.4409     0.2638  -1.671  0.21547   
+# Temperature26.6700251889169 GA - Temperature26.6700251889169 NH == 0   0.3044     0.2745   1.109  0.50656   
+# Temperature26.6700251889169 NC - Temperature26.6700251889169 NH == 0   0.7454     0.2151   3.465  0.00168 **
+
+View(EIE_glmm_repro$modelInfo)
+
+# Obtain estimated marginal means for Population at specific Temperature values
+emm_time18 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 18))  
+emm_time20 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 20))  
+emm_time24 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 24))  
+emm_time28 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 28))  
+emm_time30 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 30))  
+emm_time32 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 32))  
+emm_time34 <- emmeans(EIE_glmm_repro, ~ Population | Temperature, at = list(Temperature = 34)) 
+
+      # Perform pairwise comparisons at each specified temperature
+            pairs(emm_time18) #no significant comparisons
+            pairs(emm_time20) #no significant comparisons
+            pairs(emm_time24) #NC-NH; z.ratio = 2.6, p = 0.028
+            pairs(emm_time28) #NC-NH: z-ratio = 3.660, p= 0.0007
+            pairs(emm_time30) #NC-NH: z-ratio = 3.634  p= 0.0008
+            pairs(emm_time32) #NC-NH: z-ratio = 3.473  p= 0.0015
+            pairs(emm_time34) #NC-NH: z-ratio = 3.293  p= 0.0028
+
+             
+library(car)
+     if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( EIE_glmm_repro, ) ## default type II 
+     }  
+# Response: Prop_Survival
+#                               Chisq Df Pr(>Chisq)    
+# Temperature                187.3648  1  < 2.2e-16 ***
+# Population                   9.9843  2   0.006791 ** 
+# ParentalTempAtTimeofLaying   2.8724  1   0.090110 .  
+# Temperature:Population       3.6715  2   0.159495  
+
+
+
+```
+
+```{r GLMM confidence intervals - plot of F2 embryological thermal tolerance; Fig 3}
+library(multcomp)
+
+EIE.posthoc<- glht(EIE_glmm_repro, lsm(pairwise ~ Population | Temperature), by = NULL)
+summary(EIE.posthoc)
+
+result <- predict_response(EIE_glmm_repro, terms = c("Temperature", "Population"))
+resultz<-result #duplicate to ensure correct factor order
+resultz$TreatPop <- paste0(resultz$group, "_", resultz$facet)
+
+library(RColorBrewer)
+# Hexadecimal color specification 
+brewer.pal(n = 8, name = "Dark2")
+#  "#1B9E77" "#D95F02" "#7570B3" "#E7298A" "#66A61E" "#E6AB02" "#A6761D" "#666666"
+    
+ mycolors<-c("#1B9E77", "#D95F02", "#7570B3")
+ #Reorder legend to be north --> south
+
+resultz$group <- factor(resultz$group, levels=c("NH", "NC", "GA"))
+Surv.CI<- ggplot(data = resultz, aes(x= x, y = predicted*100), fill= group, color = group) +
+  geom_smooth(aes(x = x, y = predicted*100, group = group,  color = group), se = FALSE)+
+  geom_ribbon(aes(ymin=conf.low*100, ymax=conf.high*100, color = group, fill = group), alpha=0.1, color = NA) +
+  ylab("Survival to hatching (%)") +
+  xlab(expression("Temperature " (degree*C)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")+
+  scale_y_continuous(labels = scales::label_number(accuracy = 10),limits = c(0,100))+
+  scale_x_continuous(breaks = seq(18, 34, len = 9))+
+   scale_color_discrete(
+     limits = c("GA", "NC", "NH"),
+     labels = c('GA', 'NC', 'NH'))+
+  guides(color=guide_legend("Population"))+
+scale_color_manual(values = mycolors, guide = FALSE) +
+  scale_fill_manual(values = mycolors, guide = FALSE) +
+  geom_jitter(data = UroSurv2, width = 0.15, aes(x= Temperature, y = Prop_Survival*100, color = Population), alpha =0.4)
+Surv.CI
+
+View(UroSurv2)
+
+##### Run together
+pdf("/EmbryoThermalTolerance_SurvivaltoHatching.pdf", 10,8)
+Surv.CI
+dev.off()
+```
+
+
+Adult size distributions
+```{r Adult size distributions - plot; Fig S3}
+library(readxl)
+library(ggridges)
+
+Urosalpinx_SummaryStatistics_ReproOutput <- read_excel("Data/Urosalpinx_SummaryStatistics_ReproOutput.xlsx")
+
+ReproOverall.Zeroclutches <- Urosalpinx_SummaryStatistics_ReproOutput[Urosalpinx_SummaryStatistics_ReproOutput$total_num_clutches == 0,]
+ReproOverall.NonZeroclutches <- Urosalpinx_SummaryStatistics_ReproOutput[Urosalpinx_SummaryStatistics_ReproOutput$total_num_clutches != 0,]
+
+ReproOverall.Zeroclutches$Population <- factor(ReproOverall.Zeroclutches$Population, 
+                                               levels = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"))
+ReproOverall.NonZeroclutches$Population <- factor(ReproOverall.NonZeroclutches$Population, 
+                                                  levels = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"))
+
+levels(ReproOverall.Zeroclutches$Population)
+levels(ReproOverall.NonZeroclutches$Population)
+
+Female_faceted_distribution <- ggplot()+
+  geom_density_ridges(
+    data = ReproOverall.Zeroclutches, aes(x= Female_Mid_mm, y = factor(Population,levels = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T)),
+    fill = "dark grey",color = "dark grey",alpha = 0.4, scale = 1.2,vline_color = c("dark grey"),
+    quantile_lines = TRUE, quantiles = c(0.5)
+  ) +
+  geom_density_ridges(
+    data = ReproOverall.NonZeroclutches, aes(x= Female_Mid_mm, y = factor(Population,levels = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T)),
+    fill = "blue", color = "blue", alpha = 0.2, scale = 1.2, vline_color = c("blue"),
+    quantile_lines = TRUE, quantiles = c(0.5)
+  )+
+  scale_y_discrete(limits = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"))+
+scale_x_continuous(breaks = c(15, 20, 25, 30, 35))+
+    ggtitle("(b) Females")+
+  labs(y = "Population",
+       x = "Shell height (mm)") +
+   theme_classic() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+Female_faceted_distribution
+
+Male_distribution <- ggplot()+
+    geom_density_ridges(
+    data = Urosalpinx_SummaryStatistics_ReproOutput, aes(x= Male_Mid_mm, y = factor(Population,levels = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T)),
+    fill = "red", color = "red", alpha = 0.2, scale = 1.2, vline_color = c("red"),
+    quantile_lines = TRUE, quantiles = c(0.5)
+  )+
+scale_x_continuous(breaks = c(15, 20, 25, 30, 35))+
+    ggtitle("(a) Males")+
+   labs(y = "Population",
+       x = "Shell height (mm)") +
+   theme_classic() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+Male_distribution
+
+distribution_fig <- ggarrange(Male_distribution, Female_faceted_distribution, 
+                              ncol = 2, nrow = 1,
+                    common.legend = TRUE, legend = "right",
+                    align = "hv", 
+                    font.label = list(size = 14, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+distribution_fig
+
+pdf("/AdultSizeDistributionPlot.pdf", 10,6)
+distribution_fig
+dev.off()
+
+```
+
+
+Linear regressions of reproductive output and offspring size as a function of female size
+```{r Reproductive output as a function of provisioning - plot; Fig S5}
+library(ggpubr)
+require(grid)
+library(RColorBrewer)
+
+Urosalpinx_SummaryStatistics_ReproOutput <- read_excel("Data/Urosalpinx_SummaryStatistics_ReproOutput.xlsx")
+Size.response <- Urosalpinx_SummaryStatistics_ReproOutput
+
+Size.response$Coast <- c()
+Size.response$Coast[Size.response$Population == "GA" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "SC" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "NC" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "DE" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "RI" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "MA" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "NH" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "TO" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "RB" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "CP" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "WP" ]<- "Pacific"
+
+#Final plot
+Size.response$Population <- factor(Size.response$Population, levels = c("GA", "SC","NC","DE", "RI", "MA", "NH","CP", "RB", "TO","WP"))
+df.noCali <- Size.response[Size.response$Coast == "Atlantic",]
+df.Cali <- Size.response[Size.response$Coast == "Pacific",]
+
+# Hexadecimal color specification 
+brewer.pal(n = 8, name = "Dark2")
+#  "#1B9E77" "#D95F02" "#7570B3" "#E7298A" "#66A61E" "#E6AB02" "#A6761D"
+
+brewer.pal(n = 12, name = "Paired")
+# "#A6CEE3" "#1F78B4" "#B2DF8A" "#33A02C" "#FB9A99" "#E31A1C" "#FDBF6F" "#FF7F00" "#CAB2D6" "#6A3D9A" "#FFFF99" "#B15928"
+
+mycolors.nocali<-c("#7570B3", "black", "#D95F02", "#E6AB02", "#A6761D",  "#666666" ,"#1B9E77") 
+mycolors.cali<-c("#CAB2D6", "#6A3D9A", "#FF7F00", "#B15928")
+ 
+#Reorder legend to be north --> south
+TotalNumCapsules.plot.NoCali <- ggplot(df.noCali, aes(x = Female_Mid_mm , y = total_num_embryos, color = Population, fill = Population))+
+   geom_point(size = 1)+
+  stat_smooth(method='lm', formula= y~x, alpha = 0.1, aes(color = Population))+
+  ylim(c(0,1300))+
+  # scale_color_brewer(palette = "Dark2")+
+   xlab("Female size (mm)")+
+   ylab(expression("Total number of embryos "(female^-1)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = c(.9,.8), legend.direction = "vertical")+
+  #theme(axis.text.y=element_blank())+
+  #facet_wrap(~ Coast)+
+   ggtitle("Atlantic")+
+  scale_color_manual(values = mycolors.nocali) +
+  scale_fill_manual(values = mycolors.nocali) 
+TotalNumCapsules.plot.NoCali
+
+#df.Cali$Population <- factor(df.Cali$Population, levels = c("CP", "RB", "TO","WP"))
+TotalNumCapsules.plot.Cali <- ggplot(df.Cali, aes(x = Female_Mid_mm , y = total_num_embryos, color = Population, fill = Population))+
+   geom_point(size = 1)+
+  stat_smooth(method='lm', formula= y~x, alpha = 0.1, aes(color = Population))+
+  ylim(c(0,1300))+
+  # scale_color_brewer(palette = "Dark2")+
+   xlab("Female size (mm)")+
+   ylab(expression("Total number of embryos "(female^-1)))+
+  theme_classic(base_size = 18)+
+  #theme(legend.position = "right") +
+    theme(legend.position = c(.9,.8), legend.direction = "vertical")+
+  #theme(axis.text.y=element_blank())+
+  #facet_wrap(~ Coast)+
+   ggtitle("Pacific")+
+  scale_color_manual(values = mycolors.cali) +
+  scale_fill_manual(values = mycolors.cali) 
+TotalNumCapsules.plot.Cali
+
+
+figure <- ggarrange(TotalNumCapsules.plot.Cali + rremove("ylab") + rremove("xlab"), TotalNumCapsules.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = NULL,
+                    ncol = 2, nrow = 1,
+                    common.legend = FALSE, #legend = "right",
+                    align = "hv",
+                    font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
+
+
+pdf("/TotalNumEmbryosByFemaleSizePlot.pdf", 12,5)
+annotate_figure(figure, left = textGrob(expression("Total number of embryos "(female^-1)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob("Female size (mm)", gp = gpar(cex = 1.3)))
+dev.off()
+
+
+```
+
+```{r Hatchling size as a function of provisioning - plot; Fig S5}
+library(ggpubr)
+require(grid)
+library(RColorBrewer)
+library(tidyverse)
+
+Urosalpinx_F1_JuvenileSize <- read_excel("Data/Urosalpinx_F1_JuvenileSize.xlsx")
+Size.response<- Urosalpinx_F1_JuvenileSize
+
+Size.response$Coast <- c()
+Size.response$Coast[Size.response$Population == "GA" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "SC" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "NC" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "DE" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "RI" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "MA" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "NH" ]<- "Atlantic"
+Size.response$Coast[Size.response$Population == "TO" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "RB" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "CP" ]<- "Pacific"
+Size.response$Coast[Size.response$Population == "WP" ]<- "Pacific"
+Size.response$Coast <- factor(Size.response$Coast, levels = c("Pacific", "Atlantic"))
+
+Size.response$Population <- factor(Size.response$Population, levels = c("GA", "SC","NC","DE", "RI", "MA", "NH","CP", "RB", "TO","WP"))
+df.noCali <- Size.response[Size.response$Coast == "Atlantic",]
+df.Cali <- Size.response[Size.response$Coast == "Pacific",]
+
+HatchlingSizeProvisioning.plot.NoCali <- ggplot(df.noCali, aes(x = Provisioning , y = Area_mm2, color = Population, fill = Population))+
+   geom_point(size = 1, alpha =0.2)+
+ stat_smooth(method='lm', formula= y~x, alpha = 0.1, aes(color = Population))+
+   ylab("Hatchling size")+
+  xlab(expression("Per capita capsule area "(mm^2/embryo)))+
+  theme_classic(base_size = 18)+
+  ggtitle("Atlantic")+
+  theme(legend.position = c(.9,.85), legend.direction = "vertical")+
+  theme(legend.background=element_rect(fill = alpha("white", 0.2)))+
+    scale_color_manual(values = mycolors.nocali) +
+  scale_fill_manual(values = mycolors.nocali) 
+
+HatchlingSizeProvisioning.plot.Cali <- ggplot(df.Cali, aes(x = Provisioning , y = Area_mm2, color = Population, fill = Population))+
+   geom_point(size = 1, alpha =0.2)+
+  stat_smooth(method='lm', formula= y~x, alpha = 0.1, aes(color = Population))+
+  #ylim(c(0,3.5))+
+   #scale_color_brewer(palette = "Dark2")+
+   ylab("Hatchling size")+
+  xlab(expression("Per capita capsule area "(mm^2/embryo)))+
+   # stat_poly_eq(aes(label =  paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
+           #    rr.digits = 2, coef.digits = 2, parse = TRUE, size = 4, label.y = seq(0.8, 1, by =0.05))+
+  theme_classic(base_size = 18)+
+  ggtitle("Pacific")+
+    theme(legend.position = c(.9,.9), legend.direction = "vertical")+
+  theme(legend.background=element_rect(fill = alpha("white", 0.2)))+
+  # theme(axis.text.y=element_blank())+
+  # facet_wrap(~ Coast)+
+    scale_color_manual(values = mycolors.cali) +
+  scale_fill_manual(values = mycolors.cali) 
+
+library(ggpubr)
+require(grid)   # for the textGrob() function
+#figure <- ggarrange(TotalNumCapsules.plot.Cali, TotalNumCapsules.plot.NoCali, ncol=2)
+
+figure <- ggarrange(HatchlingSizeProvisioning.plot.Cali + rremove("ylab") + rremove("xlab"), HatchlingSizeProvisioning.plot.NoCali 
+                    + rremove("ylab") + rremove("xlab"), labels = NULL,
+                    ncol = 2, nrow = 1,
+                    common.legend = FALSE, #legend = "right",
+                    align = "hv",
+                    font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
+
+pdf("/Users/allisonrugila/Dropbox/ProjectUro_UMASS/ProvisioningByHatchlingSize_average.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Hatchling size "(mm^2)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob(expression("Per capita capsule area "(mm^2/embryo)), gp = gpar(cex = 1.3)))
+dev.off()
+
+
+
+```
+
+
+Capsule embryo density (number of embryos/capsule)
+```{r Evaluating outliers - Embryo density}
+library(readxl)
+library(performance)
+library(DHARMa)
+library(ggplot2)
+library(car)
+
+Urosalpinx_RawFecundity <- read_excel("Data/Urosalpinx_EmbryoCounts.xlsx")
+Urosalpinx_RawFecundity$Population <- as.factor(Urosalpinx_RawFecundity$Population)
+EmbryoDensity.df<- Urosalpinx_RawFecundity
+
+#Check data for violations of ANOVA
+EmbryoDensity.lm <- lm(Num_embryos ~ Population + Female_size_mm+ (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df)
+    check_model(EmbryoDensity.lm) #non-normally distributed residuals
+    check_heteroscedasticity(EmbryoDensity.lm) # p < 0.001; heteroscedastic
+    
+    par(mfrow = c(2, 2))
+   plot(EmbryoDensity.lm) #QQ plot not great
+    qqPlot(EmbryoDensity.lm) #evaluate outliers
+    
+    # Remove outiers
+    EmbryoDensity.df[1149,] # 44 embryos in capsule
+    EmbryoDensity.df[3312,] # 0 embryos in capsule
+    EmbryoDensity.df<- EmbryoDensity.df[-c(1149,3312),] 
+    
+    #Constrain data to capsules with > 0 embryos
+    EmbryoDensity.df <- EmbryoDensity.df[EmbryoDensity.df$Num_embryos >0,] 
+    
+    #data heavily skewed towards high survivorship
+ggplot(EmbryoDensity.df, aes(x=Num_embryos)) + 
+  geom_histogram() #+xlim(c(0,1))
+
+#Remove rows without data
+library(dplyr)
+EmbryoDensity.df <- filter(EmbryoDensity.df, !is.na(Num_embryos))
+
+#Visualize raw data as box and whiskers plots
+  ggplot(EmbryoDensity.df, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= Num_embryos)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = .5, pch = 21) +
+  labs(x = "Population",
+       y = "Embryo density") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+    
+EmbryoDensity.df.nooutlier<- EmbryoDensity.df
+EmbryoDensity.lm2 <- lm(Num_embryos ~ Population + Female_size_mm+ (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier)
+
+ggplot(EmbryoDensity.df.nooutlier, aes(x=Num_embryos)) + 
+  geom_histogram() 
+
+    qqPlot(EmbryoDensity.lm2) #remove additional high leverage points
+    EmbryoDensity.df.nooutlier[254,] # 20 embryos in capsule
+    EmbryoDensity.df.nooutlier[3378,] # 1 embryos in capsule
+    EmbryoDensity.df.nooutlier<- EmbryoDensity.df.nooutlier[-c(3378,254),] 
+     qqPlot(EmbryoDensity.lm2)
+     
+```
+
+```{r GLMM model selection - Embryo density}
+library(glmmTMB)
+
+#Compare GLMM model fit, by modifying distribution, zero-inflation, and dispersion parameter 
+ EmbryoDensity.glm <- glmmTMB(Num_embryos ~ Population + Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier, ziformula = ~ 0,  dispformula = ~Population , family = gaussian)
+     simulateResiduals(EmbryoDensity.glm, n = 1000, plot = TRUE) #KS test p = 0, outlier p <0.05; issues with residuals 
+     testDispersion(EmbryoDensity.glm) # p = 0.14 
+     
+EmbryoDensity.glm.int <- glmmTMB(Num_embryos ~ Population * Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier, ziformula = ~ 0,dispformula = ~Population , family = gaussian)
+           simulateResiduals(EmbryoDensity.glm.int, n = 1000, plot = TRUE) #KS test p = 0, dispersion p=0.2, outlier p <0.05; issues with residuals 
+           testDispersion(EmbryoDensity.glm.int) # p = 0.17 
+     
+EmbryoDensity.glm.gamma <- glmmTMB(Num_embryos ~ Population + Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier, ziformula = ~ 0, dispformula = ~Population, family= Gamma(link="log")) #OK
+     simulateResiduals(EmbryoDensity.glm.gamma,n = 1000, plot = TRUE)  #KS p=0, dispersion p=0.09; outlier test p=0.07
+      testDispersion(EmbryoDensity.glm.gamma) # p= 0.08 
+
+EmbryoDensity.glm.gamma.int <- glmmTMB(Num_embryos ~ Population * Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier, ziformula = ~ 0, dispformula = ~Population, family= Gamma(link="log")) #OK
+         simulateResiduals(EmbryoDensity.glm.gamma.int,n = 1000, plot = TRUE)  #KS p=0, dispersion p=0.05; outlier test p=0.04
+          testDispersion(EmbryoDensity.glm.gamma.int) # p= 0.03 
+      
+EmbryoDensity.glm.poisson <- glmmTMB(Num_embryos ~ Population + Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier,ziformula = ~ 0, dispformula = ~Population, family= genpois(link = "log")) #OK
+     simulateResiduals(EmbryoDensity.glm.poisson, n = 1000, plot = TRUE) #KS = 0, Dispersion p=1, outlier p=.9
+    testDispersion(EmbryoDensity.glm.poisson) # p= 0.12 
+    
+    EmbryoDensity.glm.poisson.int <- glmmTMB(Num_embryos ~ Population * Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier,ziformula = ~ 0, dispformula = ~Population, family= genpois(link = "log")) #OK
+     simulateResiduals(EmbryoDensity.glm.poisson.int, n = 1000, plot = TRUE) 
+    testDispersion(EmbryoDensity.glm.poisson.int) # p= 0.12 
+  
+EmbryoDensity.glm.trunc.poisson <- glmmTMB(Num_embryos ~ Population + Female_size_mm + (1|Condo_Unique/Teaboy_Unique), EmbryoDensity.df.nooutlier,ziformula = ~ 0, dispformula = ~Population, family= truncated_genpois(link = "log")) #OK
+     simulateResiduals(EmbryoDensity.glm.trunc.poisson, n = 1000, plot = TRUE) #KS = 0, Dispersion p=0.09, outlier p=.5
+      testDispersion(EmbryoDensity.glm.trunc.poisson) # p=0.07 
+     
+#Model comparison
+AIC(EmbryoDensity.glm, EmbryoDensity.glm.int, EmbryoDensity.glm.gamma,EmbryoDensity.glm.gamma.int, EmbryoDensity.glm.poisson, EmbryoDensity.glm.trunc.poisson) # models effectively equivalent
+      
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova(EmbryoDensity.glm.gamma, ) ## default type II 
+}  
+
+if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( EmbryoDensity.glm.gamma.int, ) ## default type II 
+        }  
+
+# Analysis of Deviance Table (Type II Wald chisquare tests)
+# 
+# Response: Num_embryos
+#                             Chisq Df Pr(>Chisq)    
+# Population                1051.68 10  < 2.2e-16 ***
+# Female_size_mm             248.98  1  < 2.2e-16 ***
+# Population:Female_size_mm  105.73 10  < 2.2e-16 ***
+
+library(multcomp)
+summary(glht(EmbryoDensity.glm.gamma, mcp(Population = "Tukey", interaction_average = TRUE)))
+
+
+```
+
+```{r GLMM confidence intervals - plot of Embryo density; Fig S6}
+ library(emmeans) 
+library(multcomp)
+
+m.output <- glht(EmbryoDensity.glm.poisson, mcp(Population = "Tukey"))
+summary(m.output) 
+
+Repro.glm1.CI<- emmeans(EmbryoDensity.glm.poisson, specs = ~Population, type = "response")
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+ggplot(df, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH","CP", "RB", "TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH","CP", "RB", "TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ylab("Number of embryos per capsule")+
+  theme_bw(base_size = 14)+
+  theme(legend.position = "right") +
+  scale_y_continuous(
+  labels = scales::number_format(accuracy = 0.01))
+
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+EmbryoDensity.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+ ylim(c(5,12))+
+  ylab("Number of embryos per capsule")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous( labels = scales::number_format(accuracy = 0.1))
+
+EmbryoDensity.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+ ylim(c(5,12))+
+  ylab("Number of embryos per capsule")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right")# +
+  #theme(axis.text.y=element_blank())
+  #scale_y_continuous(labels = scales::number_format(accuracy = 0.01))
+
+library(grid)   # for the textGrob() function
+library(ggpubr)
+figure <- ggarrange(EmbryoDensity.plot.Cali + rremove("ylab") + rremove("xlab"), EmbryoDensity.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(a)","(d)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/EmbryoDensityPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Embryo density"~(embryos~capsule^-1)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob(" ", gp = gpar(cex = 1.3)))
+dev.off()
+```
+
+
+Capsule area
+```{r Evaluating outliers - Capsule area}
+Urosalpinx_CapsuleArea <- read_excel("Data/Urosalpinx_CapsuleArea.xlsx")
+ReproOutput.CapsuleArea<-Urosalpinx_CapsuleArea 
+ReproOutput.CapsuleArea$Population <- as.factor(ReproOutput.CapsuleArea$Population)
+
+ggplot(ReproOutput.CapsuleArea, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= Area_mm2)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "CapsuleArea") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+#Note WP outlier point
+
+CapsuleArea.lm <- lm(Area_mm2 ~ Population + (1|FemaleSize_mm)+ (1|CondoRep/TeaboyRep),data= ReproOutput.CapsuleArea)
+        check_model(CapsuleArea.lm) #homogeneity of variance and normally distributed residuals not met
+        check_heteroscedasticity(CapsuleArea.lm) # p< 0.001
+        
+        par(mfrow = c(2, 2))
+        plot(CapsuleArea.lm) #points with high leverage
+
+        
+# Row 29, 774  are values with high leverage; 29, 2720, 1238 are driving tails 
+ReproOutput.CapsuleArea[c(29,774, 2720, 1238),]  #29 is WP outlier      
+        
+#add new column to data frame that indicates if each observation is an outlier
+      find_outlier <- function(x) {
+        return(x < quantile(x, .25) - 1.5*IQR(x) | x > quantile(x, .75) + 1.5*IQR(x))
+      }
+      
+
+      ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea %>%
+              group_by(Population) %>%
+              mutate(outlier = ifelse(find_outlier(Area_mm2), Label, NA))
+      
+      ggplot(ReproOutput.CapsuleArea, aes(x=Population, y=Area_mm2)) +
+        geom_boxplot() +
+        geom_text(aes(label=outlier), na.rm=TRUE, hjust=.3)
+
+#Outliers to be removed:  Recall that labels are duplicated for capsules in same image
+#Remove points with values > 28 mm^2
+      
+ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea[ReproOutput.CapsuleArea$Area_mm2 <=28,]
+ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea[ReproOutput.CapsuleArea$Label != "WP_215_761_2023June22_0x_001_E.jpg",] #Row 29
+
+which(ReproOutput.CapsuleArea$Population == "TO" & ReproOutput.CapsuleArea$Area_mm2 <=10) #rows 2369,2715
+ReproOutput.CapsuleArea <- ReproOutput.CapsuleArea[-c(2369,2715),]
+
+#Final dataset
+ReproOutput.CapsuleArea.nooutliers <- ReproOutput.CapsuleArea
+ggplot(ReproOutput.CapsuleArea, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH","CP", "RB", "TO", "WP"), ordered= T), y= Area_mm2)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Capsule Area (mm2)") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+```
+
+```{r GLMM model selection - Capsule area}
+library(glmmTMB)
+library(multcomp)
+
+ReproOutput.CapsuleArea.nooutliers$CondoRep <- as.factor(ReproOutput.CapsuleArea.nooutliers$CondoRep)
+ ReproOutput.CapsuleArea.nooutliers$TeaboyRep <- as.factor(ReproOutput.CapsuleArea.nooutliers$TeaboyRep)
+
+
+capsulearea.glmm.gamma <- glmmTMB(Area_mm2 ~ Population + FemaleSize_mm + (1|CondoRep/TeaboyRep), ReproOutput.CapsuleArea.nooutliers, ziformula = ~ 0, 
+                                  dispformula = ~Population, family= Gamma(link="log")) #OK
+     simulateResiduals(EmbryoDensity.glm.gamma,n = 1000, plot = TRUE)  #KS p=0, dispersion p=0.09; outlier test p=0.07
+      testDispersion(EmbryoDensity.glm.gamma) # p= 0.1 
+
+capsulearea.glmm.gamma.int <- glmmTMB(Area_mm2 ~ Population * FemaleSize_mm + (1|CondoRep/TeaboyRep), ReproOutput.CapsuleArea.nooutliers, ziformula = ~ 0, 
+                                                 dispformula = ~Population, family= Gamma(link="log")) #OK
+                      simulateResiduals(EmbryoDensity.glm.gamma.int,n = 1000, plot = TRUE)  #KS p=0, dispersion p=0.06; outlier test p=0.045
+                     testDispersion(EmbryoDensity.glm.gamma.int) # p= 0.03 
+       
+AIC(capsulearea.glmm.gamma,capsulearea.glmm.gamma.int) #Model with interaction has lower AIC
+                
+        if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( capsulearea.glmm.gamma.int, ) ## default type II 
+          }      
+# Analysis of Deviance Table (Type II Wald chisquare tests)
+# 
+# Response: Area_mm2
+#                            Chisq Df Pr(>Chisq)    
+# Population                678.49 10  < 2.2e-16 ***
+# FemaleSize_mm            1828.36  1  < 2.2e-16 ***
+# Population:FemaleSize_mm  253.98 10  < 2.2e-16 ***
+    
+      
+#These contrasts are only among Pacific or among Atlantic populations 
+       contrasts <- c("GA - SC = 0", "GA - NC = 0", "GA - DE = 0", "GA - RI = 0","GA - MA = 0","GA - NH = 0", 
+               "SC - NC = 0", "SC - DE = 0", "SC - RI = 0", "SC - MA = 0", "SC - NH = 0",
+               "NC - DE = 0", "NC - RI = 0", "NC - MA = 0", "NC - NH = 0",
+               "DE - RI = 0", "DE - MA = 0", "DE - NH = 0",
+               "RI - MA = 0", "RI - NH = 0", "MA - NH = 0",
+               "CP - RB = 0","CP - TO = 0", "CP - WP = 0",
+               "RB - TO = 0","RB - WP = 0", "TO - WP = 0")
+
+#Posthoc
+summary(glht(capsulearea.glmm.gamma.int, mcp(Population = "Tukey", interaction_average = TRUE)))
+
+ 
+```
+
+```{r GLMM confidence intervals - plot of capsule area; Fig S6}
+Repro.glm1.CI<- emmeans(capsulearea.glmm.gamma, specs = ~Population, type = "response")
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$response, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+ggplot(df, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH","CP", "RB", "TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH","CP", "RB", "TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ylab("Capsule area (mm2)")+
+  theme_bw(base_size = 14)+
+  theme(legend.position = "right") +
+  scale_y_continuous(
+  labels = scales::number_format(accuracy = 0.01))
+
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+CapsuleArea.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+ ylim(c(10,20))+
+  ylab(expression("Total number of embryos per female "~(mm^2)))+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+#  scale_y_continuous( labels = scales::number_format(accuracy = 0.1))
+
+CapsuleArea.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+ ylim(c(10,20))+
+  ylab("Total number of embryos per female")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+  #theme(axis.text.y=element_blank())
+  #scale_y_continuous(labels = scales::number_format(accuracy = 0.01))
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(CapsuleArea.plot.Cali + rremove("ylab") + rremove("xlab"), CapsuleArea.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(b)","(e)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/CapsuleAreaPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob(expression("Capsule area"~(mm^2)), rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob(" ", gp = gpar(cex = 1.3)))
+dev.off()
+```
+
+
+Survival to hatching: Experiment 1 (F1 offspring under field temperatures)
+```{r Raw data visualization - F1 Survival to hatching}
+library(ggplot2)
+library(readxl)
+Urosalpinx_F1_HatchingSuccess <- read_excel("Data/Urosalpinx_F1_HatchingSuccess.xlsx")
+ReproHatchling<-Urosalpinx_F1_HatchingSuccess
+ReproHatchling <- ReproHatchling[c(1:341),c(1:26)]
+
+ReproHatchling$Population <- as.factor(ReproHatchling$Population)
+
+#data heavily skewed towards high survivorship
+ggplot(ReproHatchling, aes(x=Prop_Hatchling_success)) + 
+  geom_histogram() +xlim(c(0,1))
+
+#Unequal variance among groups
+ggplot(ReproHatchling, aes(x= factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA", "NH", "CP", "RB", "TO","WP"), ordered= T), y= Prop_Hatchling_success)) + 
+  geom_boxplot(outlier.shape = NA, width = 0.5) + 
+  geom_jitter(height=0,width=.1, size = 3, pch = 21) +
+  labs(x = "Population",
+       y = "Juvenile survivorship (%)") +
+  theme_bw() +
+  theme(axis.title = element_text(face= 'bold', size = 15),
+        axis.text = element_text(face= 'bold', size = 15))
+
+```
+
+```{r GLMM model selection - Juvenile hatching success}
+library(DHARMa)
+library(glmmTMB)
+library(multcomp)
+
+#Binomial logit
+ReproHatchling$Population <- as.factor(ReproHatchling$Population)
+m0 <- glmmTMB(Prop_Hatchling_success~ Population + Female_size_mm + (1|CondoRep/TeaboyRep), ziformula = ~1, 
+              dispformula = ~Population,data= ReproHatchling, weights = Total_Num_embryos, family = binomial(link = "logit"))
+      simulateResiduals(m0, n = 1000, plot = TRUE) # KS p < 0.05, dispersion p = 0.1, outlier p=1
+      testDispersion(m0)  #p=0.14
+      testZeroInflation(m0)  #p=1
+      
+      m0.int <- glmmTMB(Prop_Hatchling_success~ Population * Female_size_mm + (1|CondoRep/TeaboyRep), ziformula = ~1, 
+              dispformula = ~Population,data= ReproHatchling, weights = Total_Num_embryos, family = binomial(link = "logit"))
+      simulateResiduals(m0.int, n = 1000, plot = TRUE) # KS p < 0.05, dispersion p = 0.13, outlier p=1
+      testDispersion(m0.int)  #p=0.14
+      testZeroInflation(m0.int)  #p=1
+      
+#Betabinomial with ziformula = ~1, dispformula ~population
+m7 <- glmmTMB(Prop_Hatchling_success ~ Population + Female_size_mm + (1|CondoRep/TeaboyRep), 
+              ziformula=~1, dispformula = ~ Population, data= ReproHatchling, weights = Total_Num_embryos, family = betabinomial) 
+      simulateResiduals(m7, n = 1000, plot = TRUE) #KS p = 0.003, Dispersion p=0.13, Outlier p=1
+       testDispersion(m7) #p=0.16
+       testZeroInflation(m7) #p=1
+      
+        m7.int <- glmmTMB(Prop_Hatchling_success ~ Population * Female_size_mm + (1|CondoRep/TeaboyRep), 
+                    ziformula=~1, dispformula = ~ Population, data= ReproHatchling, weights = Total_Num_embryos, family = betabinomial) 
+            simulateResiduals(m7.int, n = 1000, plot = TRUE) #KS p = 0.01, Dispersion p=0.12, Outlier p=1
+             testDispersion(m7.int) #p=0.16
+             testZeroInflation(m7.int) #p = 0.94
+
+#Betabinomial with ziformula = ~population, dispformula ~population      
+m7.pop <- glmmTMB(Prop_Hatchling_success ~ Population + Female_size_mm + (1|CondoRep/TeaboyRep), 
+              ziformula=~Population, dispformula = ~Population, data= ReproHatchling, weights = Total_Num_embryos, family = betabinomial) 
+      simulateResiduals(m7.pop, n = 1000, plot = TRUE) #KS p = 0.02, Dispersion p=0.15, Outlier p=1
+       testDispersion(m7.pop) #p=0.1
+       testZeroInflation(m7.pop) #p=1
+      
+        m7.pop.int <- glmmTMB(Prop_Hatchling_success ~ Population * Female_size_mm + (1|CondoRep/TeaboyRep), 
+                    ziformula=~Population, dispformula = ~Population, data= ReproHatchling, weights = Total_Num_embryos, family = betabinomial) 
+            simulateResiduals(m7.int, n = 1000, plot = TRUE) #KS p = 0.01, Dispersion p=0.13, Outlier p=1
+             testDispersion(m7.int) #p=0.14
+             testZeroInflation(m7.int) #p = 0.99
+
+ m.output <- glht(m7.pop, mcp(Population = "Tukey"))
+ 
+    if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( m7.pop, ) ## default type II 
+    } 
+
+#         Response: Prop_Hatchling_success
+#                 Chisq Df Pr(>Chisq)    
+# Population     65.729 10  2.939e-10 ***
+# Female_size_mm  2.836  1    0.09217 .  
+
+    if (requireNamespace("car") && getRversion() >= "3.6.0") { Anova( m7.pop.int, ) ## default type II 
+    } 
+        # Response: Prop_Hatchling_success
+        #                             Chisq Df Pr(>Chisq)    
+        # Population                69.0013 10  6.909e-11 ***
+        # Female_size_mm             5.1288  1    0.02353 *  
+        # Population:Female_size_mm 21.5740 10    0.01743 *  
+      # ---
+      # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+contrasts <- c("GA - SC = 0", "GA - NC = 0", "GA - DE = 0", "GA - RI = 0","GA - MA = 0","GA - NH = 0", 
+               "SC - NC = 0", "SC - DE = 0", "SC - RI = 0", "SC - MA = 0", "SC - NH = 0",
+               "NC - DE = 0", "NC - RI = 0", "NC - MA = 0", "NC - NH = 0",
+               "DE - RI = 0", "DE - MA = 0", "DE - NH = 0",
+               "RI - MA = 0", "RI - NH = 0", "MA - NH = 0",
+               "CP - RB = 0","CP - TO = 0", "CP - WP = 0",
+               "RB - TO = 0","RB - WP = 0", "TO - WP = 0")
+
+H <- glht(m7.1.int, linfct = mcp(Population = contrasts))
+summary(H)
+
+```
+
+```{r GLMM confidence intervals - plot of F1 hatching success, Fig S6}
+Repro.glm1.CI<- emmeans(m7.pop.int, specs= ~Population, type = "response" )
+Repro.glm1.CI <- summary(Repro.glm1.CI)
+Repro.glm1.CI.df <- cbind(Repro.glm1.CI$prob, Repro.glm1.CI$asymp.LCL, Repro.glm1.CI$asymp.UCL)
+
+pop <- c("CP", "DE", "GA", "MA", "NC", "NH", "RB", "RI", "SC", "TO", "WP")
+df<- data.frame(cbind(pop, Repro.glm1.CI.df))
+colnames(df) <- c("Population", "Predicted mean", "2.5% CI", "95% CI")
+df
+ 
+ df$Population <- as.factor(df$Population)
+ df$`Predicted mean`<- as.numeric(df$`Predicted mean`)
+ df$`2.5% CI` <- as.numeric(df$`2.5% CI`)
+ df$`95% CI` <- as.numeric(df$`95% CI`)
+ df$`2.5% CI` <- round(df$`2.5% CI`, 2)
+ df$`95% CI` <- round(df$`95% CI`, 2)
+
+ggplot(df, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH","CP", "RB", "TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH","CP", "RB", "TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ylab("Hatchling surival")+
+  theme_bw(base_size = 14)+
+  theme(legend.position = "right") +
+  scale_y_continuous(
+  labels = scales::number_format(accuracy = 0.01))
+
+#Final plot
+df.noCali <- df[c(2,3,4,5,6,8,9),]
+df.Cali <- df[c(1,7,10,11),]
+ 
+HatchingSuccess.plot.NoCali <- ggplot(df.noCali, aes(x= factor(Population, level = c("GA", "SC","NC","DE", "RI","MA", "NH")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.noCali, aes(x = factor(Population,level = c("GA", "SC","NC","DE", "RI", "MA",  "NH")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Atlantic")+
+ ylim(c(0,1))+
+  ylab("Survival to hatching")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+
+HatchingSuccess.plot.Cali <- ggplot(df.Cali, aes(x= factor(Population, level = c("CP", "RB","TO","WP")), y= `Predicted mean`))+
+   geom_point(size = 3)+
+  geom_errorbar(data = df.Cali, aes(x = factor(Population,level = c("CP", "RB","TO","WP")), ymin= `2.5% CI`, ymax= `95% CI`), width=0.2)+
+  xlab("Population")+
+  ggtitle("Pacific")+
+ ylim(c(0,1))+
+  ylab("Survival to hatching")+
+  theme_classic(base_size = 18)+
+  theme(legend.position = "right") #+
+  
+
+require(grid)   # for the textGrob() function
+figure <- ggarrange(HatchingSuccess.plot.Cali + rremove("ylab") + rremove("xlab"), HatchingSuccess.plot.NoCali + rremove("ylab") + rremove("xlab"),    labels = c("(c)","(f)"), label.x = 0.0, label.y = 1.0,
+                    ncol = 2, nrow = 1, widths = c(0.6, 1),
+                    common.legend = TRUE, legend = "bottom",
+                    align = "hv", 
+                    font.label = list(size = 18, color = "black", face = "bold", 
+                                      family = NULL, position = "top"))
+
+pdf("/F1_JuvSurvPlot.FINAL.pdf", 12,6)
+annotate_figure(figure, left = textGrob("Survival to hatching", rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob("Population", gp = gpar(cex = 1.3)))
+dev.off()
+
+```
+
+
