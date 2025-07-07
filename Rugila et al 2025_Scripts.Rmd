@@ -1,0 +1,11 @@
+---
+title: "Rugila et al. 2025 - Fast and slow-paced reproductive life history"
+author: "Allison Rugila"
+date: '2025-07-07'
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
